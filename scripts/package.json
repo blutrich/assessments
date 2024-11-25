@@ -1,0 +1,8 @@
+{
+  "name": "airtable-update-scripts",
+  "type": "module",
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "dotenv": "^16.0.3"
+  }
+}
