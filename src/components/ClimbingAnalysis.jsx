@@ -32,11 +32,24 @@ const formatDate = (dateStr) => {
   });
 };
 
-const MetricCard = ({ title, value, unit = '', subtitle = '' }) => (
+const formatMetricValue = (value, type) => {
+  if (value === null || value === undefined) return 'N/A';
+  
+  switch (type) {
+    case 'height':
+      return parseFloat(value).toFixed(1);
+    case 'weight':
+      return parseFloat(value).toFixed(1);
+    default:
+      return value;
+  }
+};
+
+const MetricCard = ({ title, value, unit = '', subtitle = '', type = 'default' }) => (
   <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
     <h3 className="text-sm font-medium text-gray-600">{title}</h3>
     <p className="text-2xl font-bold mt-1 text-indigo-700">
-      {value !== null && value !== undefined ? `${value}${unit}` : 'N/A'}
+      {value !== null && value !== undefined ? `${formatMetricValue(value, type)}${unit}` : 'N/A'}
     </p>
     {subtitle && (
       <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
@@ -270,50 +283,82 @@ const ClimbingAnalysis = ({ assessments }) => {
   const { latest, chartData, insights, prediction, trainingDays, strengthProfile, formattedSchedule } = processData;
 
   return (
-    <div ref={analysisRef} data-analysis-ref className="p-4 space-y-6 bg-white">
-      {/* Export Buttons */}
-      <div className="sticky top-0 z-50 flex justify-end gap-2 p-4 bg-white/80 backdrop-blur-sm">
-        <button
-          onClick={() => exportFullAnalysis('pdf')}
-          className="flex items-center gap-2 px-4 py-2 text-white bg-pink-500 rounded-lg hover:bg-pink-600 transition-colors shadow-md"
-        >
-          <FileText size={20} />
-          Export PDF
-        </button>
-        <button
-          onClick={() => exportFullAnalysis('images')}
-          className="flex items-center gap-2 px-4 py-2 text-white bg-pink-500 rounded-lg hover:bg-pink-600 transition-colors shadow-md"
-        >
-          <Download size={20} />
-          Export Images
-        </button>
+    <div ref={analysisRef} data-analysis-ref className="space-y-8">
+      {/* Header with export options */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold text-indigo-900 flex items-center gap-2">
+          <Activity className="text-indigo-500" />
+          Performance Analysis
+        </h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => exportFullAnalysis('pdf')}
+            className="flex items-center gap-1 px-3 py-2 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100"
+          >
+            <FileText size={16} />
+            Export PDF
+          </button>
+          <button
+            onClick={() => exportFullAnalysis('images')}
+            className="flex items-center gap-1 px-3 py-2 text-sm bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100"
+          >
+            <Download size={16} />
+            Export Images
+          </button>
+        </div>
       </div>
 
-      {/* Overview Section */}
-      <div className="bg-pink-50 rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-pink-900">
-          <Activity className="text-pink-500" />
-          Performance Overview
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Physical Metrics */}
+      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+        <h3 className="text-lg font-semibold mb-4 text-indigo-900 flex items-center gap-2">
+          <Dumbbell className="text-indigo-500" />
+          Physical Metrics
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
-            title="Current Boulder Grade"
-            value={latest['Boulder 80% Grade']}
-            subtitle="80% Grade"
+            title="Height"
+            value={latest['Personal Info']['Height']}
+            unit=" cm"
+            type="height"
           />
           <MetricCard
-            title="Current Lead Grade"
-            value={latest['Lead 80% Grade']}
-            subtitle="80% Grade"
+            title="Weight"
+            value={latest['Personal Info']['Weight']}
+            unit=" kg"
+            type="weight"
           />
           <MetricCard
-            title="Training Days"
-            value={trainingDays > 0 ? trainingDays : "N/A"}
-            unit="/week"
-            subtitle={trainingDays > 0 ? "Excluding rest days" : "No schedule set"}
+            title="Finger Strength"
+            value={latest['Finger Strength Weight']}
+            unit=" kg"
+          />
+          <MetricCard
+            title="Strength Ratio"
+            value={latest['Finger Strength Ratio']}
+            unit="%"
+            subtitle="% of body weight"
           />
         </div>
+      </div>
 
+      {/* Current Level */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard
+          title="Current Boulder Grade"
+          value={latest['Boulder 80% Grade']}
+          subtitle="80% Grade"
+        />
+        <MetricCard
+          title="Current Lead Grade"
+          value={latest['Lead 80% Grade']}
+          subtitle="80% Grade"
+        />
+        <MetricCard
+          title="Training Days"
+          value={trainingDays > 0 ? trainingDays : "N/A"}
+          unit="/week"
+          subtitle={trainingDays > 0 ? "Excluding rest days" : "No schedule set"}
+        />
       </div>
 
       {/* Progress Charts */}
