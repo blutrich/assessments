@@ -13,21 +13,13 @@ const FIELD_MAPPINGS = {
   'Pull Up Repetitions': ['PU MAX', 'Maximum pull-ups'],
   'Push Up Repetitions': ['PUSH UP MAX', 'Maximum push-ups'],
   'Toe To bar Repetitions': ['T2b MAX', 'Maximum toes-to-bar repetitions'],
-  'Leg Spread': ['Leg Spread', 'Split measurement'],
+  'Leg Spread': ['LEG SPREAD'],
   'RPE Finger Strength': ['RPE FB'],
-  'RPE Pull Ups': ['RPE PullUPs'],
+  'RPE Pull Ups': ['RPE PullUPS'],
   'RPE Push Ups': ['RPE Pushups'],
   'RPE Toe To Bar': ['RPE T2B'],
   'RPE Leg Spread': ['RPE Split'],
-  'Training Schedule': {
-    'Sunday': 'Sun Training',
-    'Monday': 'Mon Training',
-    'Tuesday': 'Tue Training',
-    'Wednesday': 'Wed Training',
-    'Thursday': 'Thu Training',
-    'Friday': 'Fri Training',
-    'Saturday': 'Sat Training'
-  },
+  'Training Schedule': ['Training Schedule'],
   'Personal Info': {
     'Height': 'height',
     'Weight': 'Weight',
@@ -67,6 +59,9 @@ const transformRecord = (record) => {
 
   console.log('Raw record fields:', record.fields);
 
+  // Debug: Log all available field names from Airtable
+  console.log('Available Airtable fields:', Object.keys(record.fields));
+
   const transformed = {
     id: record.id,
     email: record.fields.Email,
@@ -78,14 +73,36 @@ const transformRecord = (record) => {
   // Transform basic fields
   for (const [standardField, alternateFields] of Object.entries(FIELD_MAPPINGS)) {
     if (Array.isArray(alternateFields)) {
+      // Debug: Log field mapping attempt
+      console.log(`Trying to map ${standardField} from:`, alternateFields);
+      console.log('Available values:', alternateFields.map(f => record.fields[f]));
+      
       transformed[standardField] = findFieldValue(record, alternateFields);
+      
+      // Special handling for Training Schedule
+      if (standardField === 'Training Schedule') {
+        console.log('Raw Training Schedule:', record.fields['Training Schedule']);
+        transformed[standardField] = record.fields['Training Schedule'] || {};
+      }
+      
+      // Debug: Log result
+      console.log(`${standardField} mapped to:`, transformed[standardField]);
       
       // Convert numeric fields
       if (['Finger Strength Weight', 'Pull Up Repetitions', 'Push Up Repetitions', 'Toe To bar Repetitions', 'Leg Spread'].includes(standardField)) {
         const value = transformed[standardField];
-        if (value !== null) {
-          const numericValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (value !== null && value !== '') {
+          // Remove any non-numeric characters except decimal point and minus sign
+          const cleanValue = value.toString().replace(/[^\d.-]/g, '');
+          const numericValue = parseFloat(cleanValue);
           transformed[standardField] = isNaN(numericValue) ? null : numericValue;
+          
+          // Debug log for numeric conversion
+          console.log(`Converting ${standardField}:`, {
+            original: value,
+            cleaned: cleanValue,
+            final: transformed[standardField]
+          });
         }
       }
       
@@ -99,7 +116,7 @@ const transformRecord = (record) => {
         }
       }
     } else if (typeof alternateFields === 'object') {
-      // Handle nested objects (e.g., Training Schedule, Personal Info)
+      // Handle nested objects (e.g., Personal Info)
       transformed[standardField] = {};
       for (const [key, fieldName] of Object.entries(alternateFields)) {
         transformed[standardField][key] = record.fields[fieldName];

@@ -15,12 +15,12 @@ import {
   PolarRadiusAxis,
   Radar
 } from 'recharts';
-import { generateInsights, calculateProgressionRate, calculatePerformanceScore, predictGrade } from '../utils/analysis';
-import { AskAI } from './AskAI';
+import { generateInsights, calculateProgressionRate, predictGrade } from '../utils/analysis';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
 import JSZip from 'jszip';
 import { jsPDF } from 'jspdf';
+import CoachingRoadmap from './CoachingRoadmap';
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
@@ -33,13 +33,13 @@ const formatDate = (dateStr) => {
 };
 
 const MetricCard = ({ title, value, unit = '', subtitle = '' }) => (
-  <div className="bg-white p-4 rounded-lg shadow-sm">
-    <h3 className="text-sm font-medium text-pink-700">{title}</h3>
-    <p className="text-2xl font-bold mt-1 text-pink-900">
+  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+    <h3 className="text-sm font-medium text-gray-600">{title}</h3>
+    <p className="text-2xl font-bold mt-1 text-indigo-700">
       {value !== null && value !== undefined ? `${value}${unit}` : 'N/A'}
     </p>
     {subtitle && (
-      <p className="text-xs text-pink-600 mt-1">{subtitle}</p>
+      <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
     )}
   </div>
 );
@@ -159,74 +159,73 @@ const ClimbingAnalysis = ({ assessments }) => {
     }
   };
 
-  const processData = (data) => {
-    if (!data || !Array.isArray(data)) return null;
-
-    const latest = data[0];
-    const chartData = data.map(entry => {
-      return {
-        date: formatDate(entry.fields.Date),
-        grade: convertGradeToNumber(entry.fields.Grade),
-        fingerStrength: parseFloat(entry.fields.FingerStrength) || 0,
-        coreStrength: parseFloat(entry.fields.CoreStrength) || 0,
-        trainingDays: parseInt(entry.fields.TrainingDays) || 0
-      };
-    }).reverse();
-
-    return {
-      latest,
-      chartData,
-      insights: generateInsights(data),
-      performanceScore: calculatePerformanceScore(data),
-      prediction: predictGrade(data),
-      trainingDays: data.reduce((acc, curr) => acc + (parseInt(curr.fields.TrainingDays) || 0), 0),
-      strengthProfile: {
-        legSpread: latest.fields['LEG SPREAD'] || 'N/A',  // Keep for profile display only
-        fingerStrength: latest.fields.FingerStrength || 'N/A',
-        coreStrength: latest.fields.CoreStrength || 'N/A'
-      }
-    };
-  };
-
-  const processedData = useMemo(() => {
+  const processData = useMemo(() => {
     if (!assessments || assessments.length === 0) return null;
 
     console.log('Raw assessments:', assessments);
 
-    const latest = assessments[0]; // Assuming assessments are already sorted by date
-    const insights = generateInsights(assessments);
-    const performanceScore = calculatePerformanceScore(latest);
+    // Sort assessments by date (newest first)
+    const sortedAssessments = [...assessments].sort((a, b) => 
+      new Date(b['Assessment Date']) - new Date(a['Assessment Date'])
+    );
+
+    // Get the latest assessment
+    const latest = sortedAssessments[0];
+    console.log('Latest assessment:', latest);
+    console.log('Training Schedule from latest:', latest.Training_Schedule);
+    console.log('Training Schedule type:', typeof latest.Training_Schedule);
+
+    const insights = generateInsights(sortedAssessments);
     const prediction = predictGrade(latest);
 
-    // Transform and sort data for charts
-    const chartData = assessments
-      .sort((a, b) => new Date(a['Assessment Date']) - new Date(b['Assessment Date']))
-      .map(assessment => {
-        return {
-          date: formatDate(assessment['Assessment Date']),
-          fingerStrength: Number(assessment['Finger Strength Weight']) || 0,
-          pullUps: Number(assessment['Pull Up Repetitions']) || 0,
-          pushUps: Number(assessment['Push Up Repetitions']) || 0,
-          toeToBar: Number(assessment['Toe To bar Repetitions']) || 0,
-          rpeFingerStrength: Number(assessment['RPE FB']) || 0,
-          rpePullUps: Number(assessment['RPE PullUPs']) || 0,
-          rpePushUps: Number(assessment['RPE Pushups']) || 0,
-          rpeToeToBar: Number(assessment['RPE T2B']) || 0,
-          rpeSpread: Number(assessment['RPE Split']) || 0
-        };
-      });
+    // Transform and sort data for charts (oldest to newest)
+    const chartData = [...sortedAssessments]
+      .reverse()
+      .map(assessment => ({
+        date: formatDate(assessment['Assessment Date']),
+        fingerStrength: Number(assessment['Finger Strength Weight']) || 0,
+        pullUps: Number(assessment['Pull Up Repetitions']) || 0,
+        pushUps: Number(assessment['Push Up Repetitions']) || 0,
+        toeToBar: Number(assessment['Toe To bar Repetitions']) || 0,
+        rpeFingerStrength: Number(assessment['RPE Finger Strength']) || 0,
+        rpePullUps: Number(assessment['RPE Pull Ups']) || 0,
+        rpePushUps: Number(assessment['RPE Push Ups']) || 0,
+        rpeToeToBar: Number(assessment['RPE Toe To Bar']) || 0,
+        rpeSpread: Number(assessment['RPE Leg Spread']) || 0
+      }));
 
-    // Calculate training days per week
-    const trainingDays = Object.values(latest.Training_Schedule || {})
-      .filter(Boolean)
-      .length;
+    // Calculate training days per week (excluding rest days)
+    const trainingSchedule = latest.Training_Schedule || {};
+    console.log('Training Schedule:', trainingSchedule);
+
+    // Convert the schedule to an array of activities
+    const activities = Object.values(trainingSchedule).filter(Boolean);
+    console.log('Activities:', activities);
+
+    // Count days with actual training (excluding rest days and empty slots)
+    const trainingDays = activities.filter(activity => 
+      activity && 
+      !activity.toLowerCase().includes('rest') && 
+      !activity.toLowerCase().includes('מנוחה')
+    ).length;
+
+    console.log('Training days:', trainingDays);
+
+    // Format training schedule for display
+    const formattedSchedule = Object.entries(latest.Training_Schedule || {})
+      .map(([day, activity]) => ({
+        day,
+        activity: activity || 'Rest'
+      }));
+
+    console.log('Formatted schedule:', formattedSchedule);
 
     // Prepare strength profile data for radar chart
     const strengthProfile = [
       {
         metric: 'Finger Strength',
         value: Number(latest['Finger Strength Weight']) || 0,
-        fullMark: 50
+        fullMark: 80
       },
       {
         metric: 'Pull-ups',
@@ -245,20 +244,22 @@ const ClimbingAnalysis = ({ assessments }) => {
       }
     ];
 
-    console.log('Strength profile data:', strengthProfile);
+    console.log('Chart data:', chartData);
+    console.log('Strength profile:', strengthProfile);
 
     return {
       latest,
-      chartData,
       insights,
-      performanceScore,
       prediction,
+      chartData,
       trainingDays,
-      strengthProfile
+      progressionRate: calculateProgressionRate(sortedAssessments),
+      strengthProfile,
+      formattedSchedule
     };
   }, [assessments]);
 
-  if (!processedData) {
+  if (!processData) {
     return (
       <div className="bg-pink-100 text-pink-900 p-4 rounded-lg">
         No assessment data available.
@@ -266,7 +267,7 @@ const ClimbingAnalysis = ({ assessments }) => {
     );
   }
 
-  const { latest, chartData, insights, performanceScore, prediction, trainingDays, strengthProfile } = processedData;
+  const { latest, chartData, insights, prediction, trainingDays, strengthProfile, formattedSchedule } = processData;
 
   return (
     <div ref={analysisRef} data-analysis-ref className="p-4 space-y-6 bg-white">
@@ -294,28 +295,25 @@ const ClimbingAnalysis = ({ assessments }) => {
           <Activity className="text-pink-500" />
           Performance Overview
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <MetricCard
-            title="Performance Score"
-            value={performanceScore}
-            unit="/100"
-          />
-          <MetricCard
-            title="Boulder Grade"
+            title="Current Boulder Grade"
             value={latest['Boulder 80% Grade']}
             subtitle="80% Grade"
           />
           <MetricCard
-            title="Lead Grade"
+            title="Current Lead Grade"
             value={latest['Lead 80% Grade']}
             subtitle="80% Grade"
           />
           <MetricCard
             title="Training Days"
-            value={trainingDays}
+            value={trainingDays > 0 ? trainingDays : "N/A"}
             unit="/week"
+            subtitle={trainingDays > 0 ? "Excluding rest days" : "No schedule set"}
           />
         </div>
+
       </div>
 
       {/* Progress Charts */}
@@ -383,22 +381,31 @@ const ClimbingAnalysis = ({ assessments }) => {
             <h3 className="text-lg font-semibold text-pink-900 mb-4">Finger Strength Progress</h3>
             <div className="w-full h-[300px]">
               <ResponsiveContainer>
-                <LineChart data={chartData}>
-                  <XAxis dataKey="date" />
+                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 25, left: 0 }}>
+                  <XAxis 
+                    dataKey="date" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    interval={0}
+                    tick={{ fontSize: 12 }}
+                  />
                   <YAxis />
+                  <CartesianGrid strokeDasharray="3 3" />
                   <Tooltip />
                   <Line
                     type="monotone"
                     dataKey="fingerStrength"
                     stroke="#ec4899"
                     strokeWidth={2}
-                    dot={{ r: 4 }}
+                    dot={{ r: 4, fill: "#ec4899" }}
+                    activeDot={{ r: 6, fill: "#be185d" }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-2 text-sm text-pink-700">
-              Latest RPE: {latest?.['RPE FB'] || 'N/A'}
+              Latest RPE: {latest?.['RPE Finger Strength'] || 'N/A'}
             </div>
           </div>
 
@@ -407,22 +414,31 @@ const ClimbingAnalysis = ({ assessments }) => {
             <h3 className="text-lg font-semibold text-pink-900 mb-4">Pull-ups Progress</h3>
             <div className="w-full h-[300px]">
               <ResponsiveContainer>
-                <LineChart data={chartData}>
-                  <XAxis dataKey="date" />
+                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 25, left: 0 }}>
+                  <XAxis 
+                    dataKey="date" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    interval={0}
+                    tick={{ fontSize: 12 }}
+                  />
                   <YAxis />
+                  <CartesianGrid strokeDasharray="3 3" />
                   <Tooltip />
                   <Line
                     type="monotone"
                     dataKey="pullUps"
                     stroke="#ec4899"
                     strokeWidth={2}
-                    dot={{ r: 4 }}
+                    dot={{ r: 4, fill: "#ec4899" }}
+                    activeDot={{ r: 6, fill: "#be185d" }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-2 text-sm text-pink-700">
-              Latest RPE: {latest?.['RPE PullUPs'] || 'N/A'}
+              Latest RPE: {latest?.['RPE Pull Ups'] || 'N/A'}
             </div>
           </div>
 
@@ -431,22 +447,31 @@ const ClimbingAnalysis = ({ assessments }) => {
             <h3 className="text-lg font-semibold text-pink-900 mb-4">Push-ups Progress</h3>
             <div className="w-full h-[300px]">
               <ResponsiveContainer>
-                <LineChart data={chartData}>
-                  <XAxis dataKey="date" />
+                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 25, left: 0 }}>
+                  <XAxis 
+                    dataKey="date" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    interval={0}
+                    tick={{ fontSize: 12 }}
+                  />
                   <YAxis />
+                  <CartesianGrid strokeDasharray="3 3" />
                   <Tooltip />
                   <Line
                     type="monotone"
                     dataKey="pushUps"
                     stroke="#ec4899"
                     strokeWidth={2}
-                    dot={{ r: 4 }}
+                    dot={{ r: 4, fill: "#ec4899" }}
+                    activeDot={{ r: 6, fill: "#be185d" }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-2 text-sm text-pink-700">
-              Latest RPE: {latest?.['RPE Pushups'] || 'N/A'}
+              Latest RPE: {latest?.['RPE Push Ups'] || 'N/A'}
             </div>
           </div>
 
@@ -455,22 +480,31 @@ const ClimbingAnalysis = ({ assessments }) => {
             <h3 className="text-lg font-semibold text-pink-900 mb-4">Toe to Bar Progress</h3>
             <div className="w-full h-[300px]">
               <ResponsiveContainer>
-                <LineChart data={chartData}>
-                  <XAxis dataKey="date" />
+                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 25, left: 0 }}>
+                  <XAxis 
+                    dataKey="date" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    interval={0}
+                    tick={{ fontSize: 12 }}
+                  />
                   <YAxis />
+                  <CartesianGrid strokeDasharray="3 3" />
                   <Tooltip />
                   <Line
                     type="monotone"
                     dataKey="toeToBar"
                     stroke="#ec4899"
                     strokeWidth={2}
-                    dot={{ r: 4 }}
+                    dot={{ r: 4, fill: "#ec4899" }}
+                    activeDot={{ r: 6, fill: "#be185d" }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-2 text-sm text-pink-700">
-              Latest RPE: {latest?.['RPE T2B'] || 'N/A'}
+              Latest RPE: {latest?.['RPE Toe To Bar'] || 'N/A'}
             </div>
           </div>
         </div>
@@ -482,41 +516,56 @@ const ClimbingAnalysis = ({ assessments }) => {
           <Target className="text-pink-500" />
           Grade Prediction
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-lg">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-pink-900 mb-2">Predicted Grade</h3>
-              <div className="flex items-center gap-4">
-                <span className="text-3xl font-bold text-pink-600">{prediction?.predictedGrade || 'N/A'}</span>
-                <span className="text-sm text-pink-700 px-2 py-1 bg-pink-50 rounded">
-                  {prediction?.confidence} Confidence
-                </span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-pink-700">Strongest Area:</span>
-                <span className="font-medium text-pink-900">{prediction?.strongest?.replace(/([A-Z])/g, ' $1').trim()}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-pink-700">Weakest Area:</span>
-                <span className="font-medium text-pink-900">{prediction?.weakest?.replace(/([A-Z])/g, ' $1').trim()}</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-4">
+            <MetricCard
+              title="Predicted Boulder Grade"
+              value={prediction?.boulder || 'N/A'}
+              subtitle="Based on current metrics"
+            />
+            <MetricCard
+              title="Predicted Lead Grade"
+              value={prediction?.lead || 'N/A'}
+              subtitle="French grading system"
+            />
+          </div>
+          <div className="space-y-4">
+            <MetricCard
+              title="Confidence Score"
+              value={prediction?.analysis?.confidenceScore || 'N/A'}
+              unit="%"
+              subtitle="Prediction accuracy"
+            />
+            <div className="bg-pink-50 p-4 rounded-lg shadow-sm border border-pink-100">
+              <h3 className="text-lg font-semibold text-pink-900 mb-3">Performance Areas</h3>
+              <div className="space-y-3">
+                <div className="bg-white p-3 rounded border border-pink-100">
+                  <p className="text-pink-900">
+                    <span className="font-semibold text-pink-700">Strongest: </span>
+                    <span className="text-pink-800">{prediction?.analysis?.strongestArea || 'N/A'}</span>
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded border border-pink-100">
+                  <p className="text-pink-900">
+                    <span className="font-semibold text-pink-700">Weakest: </span>
+                    <span className="text-pink-800">{prediction?.analysis?.weakestArea || 'N/A'}</span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-
-          <div className="bg-white p-6 rounded-lg">
-            <h3 className="text-lg font-semibold text-pink-900 mb-4">Training Recommendations</h3>
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium text-pink-700 mb-1">Primary Focus</h4>
-                <p className="text-sm text-pink-900">{prediction?.recommendations?.primary?.exercises}</p>
-                <p className="text-xs text-pink-600 mt-1">{prediction?.recommendations?.primary?.protocol}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-pink-700 mb-1">Secondary Focus</h4>
-                <p className="text-sm text-pink-900">{prediction?.recommendations?.secondary?.exercises}</p>
-                <p className="text-xs text-pink-600 mt-1">{prediction?.recommendations?.secondary?.protocol}</p>
+          <div className="space-y-4">
+            <div className="bg-pink-50 p-4 rounded-lg shadow-sm border border-pink-100">
+              <h3 className="text-lg font-semibold text-pink-900 mb-3">Training Recommendations</h3>
+              <div className="space-y-3">
+                <div className="bg-white p-3 rounded border border-pink-100">
+                  <p className="font-semibold text-pink-700 mb-1">Primary Focus</p>
+                  <p className="text-pink-800">{prediction?.analysis?.primaryFocus || 'N/A'}</p>
+                </div>
+                <div className="bg-white p-3 rounded border border-pink-100">
+                  <p className="font-semibold text-pink-700 mb-1">Secondary Focus</p>
+                  <p className="text-pink-800">{prediction?.analysis?.secondaryFocus || 'N/A'}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -545,9 +594,6 @@ const ClimbingAnalysis = ({ assessments }) => {
         </div>
       </div>
 
-      {/* Ask AI Coach */}
-      <AskAI assessments={assessments} latestAssessment={latest} />
-
       {/* Equipment */}
       <div className="bg-pink-50 rounded-lg shadow p-6">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-pink-900">
@@ -571,6 +617,51 @@ const ClimbingAnalysis = ({ assessments }) => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Training Schedule */}
+      <div className="bg-pink-50 rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-pink-900">
+          <Calendar className="text-pink-500" />
+          Training Schedule
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-pink-900 mb-3">Weekly Schedule</h3>
+            {formattedSchedule.length > 0 ? (
+              <div className="space-y-2">
+                {formattedSchedule.map((item, index) => (
+                  <div 
+                    key={index} 
+                    className={`flex justify-between items-center p-2 rounded ${
+                      item.activity.toLowerCase().includes('rest') 
+                        ? 'bg-gray-50 text-gray-500' 
+                        : 'bg-white'
+                    }`}
+                  >
+                    <span className="font-medium">{item.day}</span>
+                    <span>{item.activity}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-pink-600">No schedule available</p>
+            )}
+          </div>
+          <div>
+            <MetricCard
+              title="Training Days"
+              value={trainingDays > 0 ? trainingDays : "N/A"}
+              unit="/week"
+              subtitle={trainingDays > 0 ? "Excluding rest days" : "No schedule set"}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Coaching Roadmap */}
+      <div className="mt-8">
+        <CoachingRoadmap />
       </div>
 
       {/* Insights */}

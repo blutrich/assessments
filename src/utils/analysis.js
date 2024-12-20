@@ -37,48 +37,6 @@ export const calculateProgressionRate = (assessments) => {
   return (lastBoulderGrade - firstBoulderGrade) / monthsDiff;
 };
 
-// Calculate performance score based on latest assessment
-export const calculatePerformanceScore = (assessment) => {
-  if (!assessment) return 0;
-
-  let score = 0;
-  let metrics = 0;
-
-  // Boulder grade contribution (max 40 points)
-  const boulderGrade = boulderGradeToNumber(assessment['Boulder 80% Grade']);
-  if (boulderGrade !== null) {
-    score += Math.min(40, boulderGrade * 4);
-    metrics++;
-  }
-
-  // Finger strength contribution (max 30 points)
-  const fingerStrength = parseFloat(assessment['Finger Strength Weight']);
-  if (!isNaN(fingerStrength)) {
-    score += Math.min(30, fingerStrength / 3);
-    metrics++;
-  }
-
-  // Pull-ups contribution (max 15 points)
-  const pullUps = parseInt(assessment['Pull Up Repetitions']);
-  if (!isNaN(pullUps)) {
-    score += Math.min(15, pullUps);
-    metrics++;
-  }
-
-  // Push-ups contribution (max 15 points)
-  const pushUps = parseInt(assessment['Push Up Repetitions']);
-  if (!isNaN(pushUps)) {
-    score += Math.min(15, pushUps / 2);
-    metrics++;
-  }
-
-  // If no metrics available, return 0
-  if (metrics === 0) return 0;
-
-  // Normalize score based on available metrics
-  return Math.round((score / metrics) * (100 / 40));
-};
-
 // Generate insights based on assessment history
 export const generateInsights = (assessments) => {
   if (!assessments || assessments.length === 0) return [];
@@ -216,7 +174,7 @@ export const findPlateaus = (assessments, metric) => {
   return plateaus;
 };
 
-// Calculate normalized metrics
+// Normalize metrics according to specified formulas
 const normalizeMetrics = (assessment) => {
   const metrics = {
     fingerStrength: 0,
@@ -228,115 +186,168 @@ const normalizeMetrics = (assessment) => {
 
   if (!assessment) return metrics;
 
-  // Get body weight and height
-  const bodyWeight = Number(assessment.Personal_Info?.Weight) || 70; // default weight if not provided
-  const height = Number(assessment.Personal_Info?.Height) || 170; // default height if not provided
+  // Get basic measurements
+  const bodyWeight = Number(assessment.Personal_Info?.Weight) || 70;
+  const height = Number(assessment.Personal_Info?.Height) || 170;
 
-  console.log('Body weight:', bodyWeight, 'Height:', height);
+  console.log('Basic measurements:', {
+    bodyWeight,
+    height,
+    rawWeight: assessment.Personal_Info?.Weight,
+    rawHeight: assessment.Personal_Info?.Height
+  });
 
-  // Normalize finger strength: (added weight + body weight) / body weight
+  // Normalize finger strength: (added_weight + body_weight) / body_weight
   const fingerWeight = Number(assessment['Finger Strength Weight']) || 0;
   if (bodyWeight > 0) {
     metrics.fingerStrength = (fingerWeight + bodyWeight) / bodyWeight;
-    console.log('Finger strength calculation:', `(${fingerWeight} + ${bodyWeight}) / ${bodyWeight} = ${metrics.fingerStrength}`);
+    console.log('Finger strength calculation:', {
+      fingerWeight,
+      bodyWeight,
+      normalized: metrics.fingerStrength
+    });
   }
 
-  // Normalize pull-ups: max reps / body weight
+  // Normalize strength metrics relative to body weight
   const pullUps = Number(assessment['Pull Up Repetitions']) || 0;
   metrics.pullUps = pullUps / bodyWeight;
 
-  // Normalize push-ups: max reps / body weight
   const pushUps = Number(assessment['Push Up Repetitions']) || 0;
   metrics.pushUps = pushUps / bodyWeight;
 
-  // Normalize core strength: max reps / body weight
   const toeToBar = Number(assessment['Toe To bar Repetitions']) || 0;
   metrics.coreStrength = toeToBar / bodyWeight;
 
-  // Normalize flexibility: leg spread distance / height
-  const legSpreadStr = assessment['Leg Spread'] || '0';
-  // Extract numeric part from string (e.g., "165" -> 165)
-  const legSpread = Number(legSpreadStr) || 0;
+  // Normalize flexibility: leg_spread_distance / height
+  const legSpread = Number(assessment['Leg Spread']) || 0;
+  console.log('Leg spread raw value:', {
+    raw: assessment['Leg Spread'],
+    converted: legSpread
+  });
+  
   if (height > 0) {
     metrics.flexibility = legSpread / height;
+    console.log('Flexibility calculation:', {
+      legSpread,
+      height,
+      normalized: metrics.flexibility
+    });
   }
 
-  console.log('Leg spread raw:', legSpreadStr, 'parsed:', legSpread);
-  console.log('Normalized metrics:', metrics);
-
+  console.log('Final normalized metrics:', metrics);
   return metrics;
 };
 
-// Predict climbing grade based on metrics
-export const predictGrade = (assessment) => {
+// Calculate composite score with specified weights
+const calculateCompositeScore = (metrics) => {
+  const weightedScores = {
+    fingerStrength: 0.45 * metrics.fingerStrength,
+    pullUps: 0.15 * metrics.pullUps,
+    pushUps: 0.10 * metrics.pushUps,
+    coreStrength: 0.20 * metrics.coreStrength,
+    flexibility: 0.10 * metrics.flexibility
+  };
+
+  console.log('Weighted scores:', weightedScores);
+
+  const totalScore = Object.values(weightedScores).reduce((sum, score) => sum + score, 0);
+  console.log('Total composite score:', totalScore);
+
+  return totalScore;
+};
+
+// Calculate performance metrics and recommendations
+export const analyzePerformance = (assessment) => {
   if (!assessment) return null;
 
   const metrics = normalizeMetrics(assessment);
-  
-  // Calculate composite score using exact weights
-  const compositeScore = (
-    0.45 * metrics.fingerStrength +
-    0.20 * metrics.pullUps +
-    0.10 * metrics.pushUps +
-    0.15 * metrics.coreStrength +
-    0.10 * metrics.flexibility
-  );
-
-  console.log('Composite score:', compositeScore);
-
-  // Determine grade based on exact thresholds
-  let predictedGrade;
-  let confidence = 'Medium';
-
-  if (compositeScore > 1.45) predictedGrade = 'V12';
-  else if (compositeScore >= 1.30) predictedGrade = 'V11';
-  else if (compositeScore >= 1.15) predictedGrade = 'V10';
-  else if (compositeScore >= 1.05) predictedGrade = 'V9';
-  else if (compositeScore >= 0.95) predictedGrade = 'V8';
-  else if (compositeScore >= 0.85) predictedGrade = 'V7';
-  else if (compositeScore >= 0.75) predictedGrade = 'V6';
-  else if (compositeScore >= 0.65) predictedGrade = 'V5';
-  else predictedGrade = 'V4';
+  const compositeScore = calculateCompositeScore(metrics);
 
   // Find strongest and weakest areas
-  const metricEntries = Object.entries(metrics);
-  const strongest = metricEntries.reduce((a, b) => a[1] > b[1] ? a : b);
-  const weakest = metricEntries.reduce((a, b) => a[1] < b[1] ? a : b);
+  const areas = [
+    { name: 'Finger Strength', value: metrics.fingerStrength, weight: 0.45 },
+    { name: 'Pull-ups', value: metrics.pullUps, weight: 0.15 },
+    { name: 'Core Strength', value: metrics.coreStrength, weight: 0.20 },
+    { name: 'Push-ups', value: metrics.pushUps, weight: 0.10 },
+    { name: 'Flexibility', value: metrics.flexibility, weight: 0.10 }
+  ];
+
+  const sortedAreas = [...areas].sort((a, b) => b.value - a.value);
+  const strongestArea = sortedAreas[0];
+  const weakestArea = sortedAreas[sortedAreas.length - 1];
+
+  // Calculate confidence score (0-100)
+  const confidenceScore = Math.round((compositeScore / 1.45) * 100);
+
+  // Generate training recommendations
+  const primaryFocus = weakestArea.name;
+  const secondaryFocus = sortedAreas[sortedAreas.length - 2].name;
 
   // Training recommendations based on weakest areas
-  const recommendations = {
-    fingerStrength: {
-      exercises: 'Max hangs on 20mm edge, 2x/week with 72h rest',
-      protocol: '7s hang, 3min rest, 4-6 sets at RPE 8-9'
-    },
-    pullUps: {
-      exercises: 'Weighted pull-ups and max rep sets',
-      protocol: '3-5 sets of 3-5 reps with added weight, 2x/week'
-    },
-    pushUps: {
-      exercises: 'Weighted push-ups and decline push-ups',
-      protocol: '3-4 sets of 8-12 reps, 2-3x/week'
-    },
-    coreStrength: {
-      exercises: 'Toe to bar progression and front lever work',
-      protocol: '4 sets to technical failure, 2-3x/week'
-    },
-    flexibility: {
-      exercises: 'Dynamic and static stretching for splits',
-      protocol: '15-20 minutes daily, focus on active flexibility'
-    }
+  const trainingRecommendations = {
+    'Finger Strength': 'Focus on hangboard training with proper rest periods',
+    'Pull-ups': 'Incorporate weighted pull-ups and lock-off exercises',
+    'Core Strength': 'Add front lever progressions and toe-to-bar variations',
+    'Push-ups': 'Include antagonist training and shoulder stability work',
+    'Flexibility': 'Regular stretching sessions focusing on hip mobility'
   };
 
   return {
-    predictedGrade,
-    confidence,
-    compositeScore,
-    metrics,
-    strongest: strongest[0],
-    weakest: weakest[0],
-    recommendations: {
-      primary: recommendations[weakest[0]],
-      secondary: recommendations[metricEntries.sort((a, b) => a[1] - b[1])[1][0]]
-    }
+    strongestArea: strongestArea.name,
+    weakestArea: weakestArea.name,
+    confidenceScore,
+    primaryFocus: trainingRecommendations[primaryFocus],
+    secondaryFocus: trainingRecommendations[secondaryFocus]
+  };
+};
+
+// Convert boulder grade to French grade
+const boulderToFrench = {
+  'V0': '6a',
+  'V1': '6b+',
+  'V2': '6c',
+  'V3': '6c+',
+  'V4': '7a',
+  'V5': '7a+',
+  'V6': '7b',
+  'V7': '7b+',
+  'V8': '7c',
+  'V9': '7c+',
+  'V10': '8a',
+  'V11': '8a+',
+  'V12': '8b',
+  'V13': '8b+',
+  'V14': '8c',
+  'V15': '8c+'
+};
+
+// Predict climbing grade based on composite score
+export const predictGrade = (assessment) => {
+  if (!assessment) return { boulder: null, lead: null, analysis: null };
+
+  const metrics = normalizeMetrics(assessment);
+  const compositeScore = calculateCompositeScore(metrics);
+  const analysis = analyzePerformance(assessment);
+
+  // Boulder grade thresholds
+  let boulderGrade;
+  if (compositeScore > 1.45) boulderGrade = 'V12';
+  else if (compositeScore >= 1.30) boulderGrade = 'V11';
+  else if (compositeScore >= 1.15) boulderGrade = 'V10';
+  else if (compositeScore >= 1.05) boulderGrade = 'V9';
+  else if (compositeScore >= 0.95) boulderGrade = 'V8';
+  else if (compositeScore >= 0.85) boulderGrade = 'V7';
+  else if (compositeScore >= 0.75) boulderGrade = 'V6';
+  else if (compositeScore >= 0.65) boulderGrade = 'V5';
+  else boulderGrade = 'V4';
+
+  // Convert to French grade for lead
+  const leadGrade = boulderToFrench[boulderGrade];
+
+  return {
+    boulder: boulderGrade,
+    lead: leadGrade,
+    analysis: analysis,
+    compositeScore: compositeScore.toFixed(2)
   };
 };
