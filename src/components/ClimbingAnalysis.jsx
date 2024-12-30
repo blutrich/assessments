@@ -184,13 +184,18 @@ const ClimbingAnalysis = ({ assessments }) => {
       new Date(b['Assessment Date']) - new Date(a['Assessment Date'])
     );
 
-    // Get the latest assessment
-    const latest = sortedAssessments[0];
+    // Get the latest assessment with null checks
+    const latest = sortedAssessments[0] || {};
+    const personalInfo = latest['Personal Info'] || {};
+    
+    // Safe access to values with defaults
     console.log('Latest assessment:', latest);
-    console.log('Weight:', latest['Personal Info']['Weight']);
+    console.log('Weight:', personalInfo['Weight']);
     console.log('Finger Strength Weight:', latest['Finger Strength Weight']);
 
     const calculateFingerStrength = (assessment) => {
+      if (!assessment || !assessment['Personal Info']) return 100;
+      
       const bodyWeight = Number(assessment['Personal Info']['Weight']) || 0;
       const addedWeight = Number(assessment['Finger Strength Weight']) || 0;
       
@@ -209,12 +214,17 @@ const ClimbingAnalysis = ({ assessments }) => {
     const insights = generateInsights(sortedAssessments);
     const prediction = predictGrade(latest);
 
-    // Transform and sort data for charts (oldest to newest)
+    // Transform and sort data for charts (oldest to newest) with null checks
     const chartData = [...sortedAssessments]
       .reverse()
       .map(assessment => {
-        const weight = Number(assessment['Personal Info']['Weight']);
-        const addedWeight = Number(assessment['Finger Strength Weight']);
+        if (!assessment || !assessment['Personal Info']) {
+          console.warn('Invalid assessment data:', assessment);
+          return null;
+        }
+
+        const weight = Number(assessment['Personal Info']['Weight']) || 0;
+        const addedWeight = Number(assessment['Finger Strength Weight']) || 0;
         const strengthPct = calculateFingerStrength(assessment);
         
         console.log('Assessment date:', assessment['Assessment Date']);
@@ -223,8 +233,8 @@ const ClimbingAnalysis = ({ assessments }) => {
         console.log('Strength %:', strengthPct);
         
         return {
-          date: formatDate(assessment['Assessment Date']),
-          fingerStrengthPct: strengthPct || 0,
+          date: formatDate(assessment['Assessment Date']) || 'Unknown Date',
+          fingerStrengthPct: strengthPct || 100,
           fingerStrengthWeight: addedWeight || 0,
           bodyWeight: weight || 0,
           pullUps: Number(assessment['Pull Up Repetitions']) || 0,
@@ -236,7 +246,8 @@ const ClimbingAnalysis = ({ assessments }) => {
           rpeToeToBar: Number(assessment['RPE Toe To Bar']) || 0,
           rpeSpread: Number(assessment['RPE Leg Spread']) || 0
         };
-      });
+      })
+      .filter(Boolean); // Remove any null entries
 
     // Calculate training days per week (excluding rest days)
     const trainingSchedule = latest.Training_Schedule || {};
@@ -353,26 +364,26 @@ const ClimbingAnalysis = ({ assessments }) => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <MetricCard
             title="Height"
-            value={latest['Personal Info']['Height']}
+            value={latest?.['Personal Info']?.['Height']}
             unit=" cm"
             type="height"
           />
           <MetricCard
             title="Weight"
-            value={latest['Personal Info']['Weight']}
+            value={latest?.['Personal Info']?.['Weight']}
             unit=" kg"
             type="weight"
           />
           <MetricCard
             title="Finger Strength (Added Weight)"
-            value={latest['Finger Strength Weight']}
+            value={latest?.['Finger Strength Weight']}
             unit="kg"
             subtitle="Weight added to body weight"
             type="weight"
           />
           <MetricCard
             title="Finger Strength (%BW)"
-            value={calculateFingerStrength(latest).toFixed(1)}
+            value={calculateFingerStrength(latest)}
             unit="%"
             subtitle="Total weight as % of body weight"
             type="percentage"
@@ -384,12 +395,12 @@ const ClimbingAnalysis = ({ assessments }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <MetricCard
           title="Current Boulder Grade"
-          value={latest['Boulder 80% Grade']}
+          value={latest?.['Boulder 80% Grade']}
           subtitle="80% Grade"
         />
         <MetricCard
           title="Current Lead Grade"
-          value={latest['Lead 80% Grade']}
+          value={latest?.['Lead 80% Grade']}
           subtitle="80% Grade"
         />
         <MetricCard
