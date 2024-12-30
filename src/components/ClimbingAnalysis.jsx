@@ -190,7 +190,20 @@ const ClimbingAnalysis = ({ assessments }) => {
     console.log('Weight:', latest['Personal Info']['Weight']);
     console.log('Finger Strength Weight:', latest['Finger Strength Weight']);
 
-    const fingerStrengthPct = (Number(latest['Finger Strength Weight']) + Number(latest['Personal Info']['Weight'])) / Number(latest['Personal Info']['Weight']) * 100;
+    const calculateFingerStrength = (assessment) => {
+      const bodyWeight = Number(assessment['Personal Info']['Weight']) || 0;
+      const addedWeight = Number(assessment['Finger Strength Weight']) || 0;
+      
+      if (bodyWeight <= 0) return 100; // Return baseline if no valid body weight
+      
+      // Calculate total weight as percentage of body weight
+      const totalWeight = addedWeight + bodyWeight;
+      const strengthPercentage = (totalWeight / bodyWeight) * 100;
+      
+      return strengthPercentage;
+    };
+
+    const fingerStrengthPct = calculateFingerStrength(latest);
     console.log('Finger Strength %:', fingerStrengthPct);
 
     const insights = generateInsights(sortedAssessments);
@@ -202,7 +215,7 @@ const ClimbingAnalysis = ({ assessments }) => {
       .map(assessment => {
         const weight = Number(assessment['Personal Info']['Weight']);
         const addedWeight = Number(assessment['Finger Strength Weight']);
-        const strengthPct = (addedWeight + weight) / weight * 100;
+        const strengthPct = calculateFingerStrength(assessment);
         
         console.log('Assessment date:', assessment['Assessment Date']);
         console.log('Weight:', weight);
@@ -359,7 +372,7 @@ const ClimbingAnalysis = ({ assessments }) => {
           />
           <MetricCard
             title="Finger Strength (%BW)"
-            value={((Number(latest['Finger Strength Weight']) + Number(latest['Personal Info']['Weight'])) / Number(latest['Personal Info']['Weight']) * 100).toFixed(1)}
+            value={calculateFingerStrength(latest).toFixed(1)}
             unit="%"
             subtitle="Total weight as % of body weight"
             type="percentage"

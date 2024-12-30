@@ -34,17 +34,6 @@ function CohortAnalysis({ usersData }) {
       let bodyWeight = Number(assessment['Personal Info']['Weight']);
       let addedWeight = Number(assessment['Finger Strength Weight']);
 
-      // Detailed validation logging
-      if (boulderGrade === 'V7-8') {
-        console.log('Found V7-8 athlete:', {
-          email: user.email,
-          rawBodyWeight: assessment['Personal Info']['Weight'],
-          rawAddedWeight: assessment['Finger Strength Weight'],
-          parsedBodyWeight: bodyWeight,
-          parsedAddedWeight: addedWeight
-        });
-      }
-
       // Validation checks
       if (isNaN(bodyWeight) || bodyWeight <= 0) {
         console.warn(`Invalid body weight for user ${user.email}:`, bodyWeight);
@@ -54,23 +43,20 @@ function CohortAnalysis({ usersData }) {
         console.warn(`Invalid added weight for user ${user.email}:`, addedWeight);
         addedWeight = 0;
       }
-      if (addedWeight > 200) {
-        console.warn(`Suspiciously high added weight for user ${user.email}:`, addedWeight);
+
+      // Calculate finger strength as percentage of body weight
+      let fingerStrength = 100; // Base 100% (just body weight)
+      if (addedWeight > 0) {
+        fingerStrength = ((addedWeight + bodyWeight) / bodyWeight) * 100;
       }
 
-      // Calculate finger strength with bounds checking
-      let fingerStrength = 1;
-      if (addedWeight > 0) {
-        fingerStrength = (addedWeight + bodyWeight) / bodyWeight;
-        
-        // Log if the ratio seems unreasonable
-        if (fingerStrength > 3) {
-          console.warn(`Very high strength ratio for user ${user.email}:`, {
-            bodyWeight,
-            addedWeight,
-            ratio: fingerStrength
-          });
-        }
+      // Log if the ratio seems unreasonable
+      if (fingerStrength > 300) {
+        console.warn(`Very high strength ratio for user ${user.email}:`, {
+          bodyWeight,
+          addedWeight,
+          percentage: fingerStrength
+        });
       }
 
       // Group by grade
@@ -208,21 +194,21 @@ function CohortAnalysis({ usersData }) {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="grade" />
                 <YAxis 
-                  label={{ value: 'Added Weight % of BW', angle: -90, position: 'insideLeft' }}
-                  tickFormatter={(value) => `${((value - 1) * 100).toFixed(0)}%`}
-                  domain={[1, (dataMax) => Math.min(dataMax, 3)]} // Cap at 200% added weight
+                  label={{ value: 'Total Weight (% of Body Weight)', angle: -90, position: 'insideLeft' }}
+                  tickFormatter={(value) => `${value.toFixed(0)}%`}
+                  domain={[100, (dataMax) => Math.min(dataMax, 300)]} // Start at 100%, cap at 300%
                 />
                 <Tooltip 
-                  formatter={(value) => [`+${((value - 1) * 100).toFixed(1)}% BW`, 'Added Weight']}
+                  formatter={(value) => [`${value.toFixed(1)}%`, 'Total Weight']}
                 />
                 <Legend />
                 <Bar 
                   dataKey="avgFingerStrength" 
                   fill="#8884d8" 
-                  name="Added Weight % of BW"
+                  name="Total Weight % of BW"
                   label={{ 
                     position: 'top',
-                    formatter: (value) => `+${((value - 1) * 100).toFixed(0)}%`
+                    formatter: (value) => `${value.toFixed(0)}%`
                   }} 
                 />
               </BarChart>
@@ -312,7 +298,7 @@ function CohortAnalysis({ usersData }) {
               <tr key={grade.grade}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{grade.grade}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.count}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{((grade.avgFingerStrength - 1) * 100).toFixed(1)}%</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.avgFingerStrength.toFixed(1)}%</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{(grade.avgPullUps * 100).toFixed(1)}%</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{(grade.avgPushUps * 100).toFixed(1)}%</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{(grade.avgToeToBar * 100).toFixed(1)}%</td>
