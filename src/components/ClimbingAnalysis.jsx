@@ -393,7 +393,7 @@ const ClimbingAnalysis = ({ assessments }) => {
             title="Finger Strength (%BW)"
             value={calculateFingerStrength(latest)}
             unit="%"
-            subtitle="Total weight as % of body weight"
+            subtitle={`Total: ${(Number(latest?.['Finger Strength Weight'] || 0) + Number(latest?.['Personal Info']?.['Weight'] || 0)).toFixed(1)}kg`}
             type="percentage"
           />
         </div>
@@ -820,13 +820,6 @@ const ClimbingAnalysis = ({ assessments }) => {
           </p>
         </div>
       </div>
-      <MetricCard
-        title="Finger Strength"
-        value={calculateFingerStrength(latest)}
-        unit="%"
-        subtitle={`Total: ${(Number(latest?.['Finger Strength Weight'] || 0) + Number(latest?.['Personal Info']?.['Weight'] || 0)).toFixed(1)}kg`}
-        type="percentage"
-      />
     </div>
   );
 };
