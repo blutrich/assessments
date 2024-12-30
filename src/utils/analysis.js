@@ -77,17 +77,20 @@ export const generateInsights = (assessments) => {
   }
 
   // Finger strength insights
-  const fingerStrength = parseFloat(latest['Finger Strength Weight']);
+  const bodyWeight = parseFloat(latest['Personal Info']['Weight']);
+  const addedWeight = parseFloat(latest['Finger Strength Weight']);
+  const fingerStrength = (addedWeight + bodyWeight) / bodyWeight * 100;
+  
   if (!isNaN(fingerStrength)) {
-    if (fingerStrength > 30) {
+    if (fingerStrength > 150) {
       insights.push({
         type: 'positive',
-        message: 'Your finger strength is well-developed. Remember to maintain proper rest and recovery.'
+        message: `Your finger strength is well-developed at ${fingerStrength.toFixed(1)}% of your body weight (${addedWeight}kg added to ${bodyWeight}kg). Remember to maintain proper rest and recovery.`
       });
-    } else if (fingerStrength < 15) {
+    } else if (fingerStrength < 120) {
       insights.push({
         type: 'info',
-        message: 'Consider incorporating more structured hangboard training to improve finger strength.'
+        message: `Your current finger strength is ${fingerStrength.toFixed(1)}% of your body weight (${addedWeight}kg added to ${bodyWeight}kg). Consider incorporating more structured hangboard training to improve finger strength, aiming for at least 150% of your body weight.`
       });
     }
   }

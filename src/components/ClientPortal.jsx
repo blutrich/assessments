@@ -15,32 +15,25 @@ function ClientPortal() {
   const [userEmail, setUserEmail] = useState(null);
   const [isCoachUser, setIsCoachUser] = useState(false);
 
+  const loadUserData = async (email) => {
+    try {
+      setLoading(true);
+      setError(null);
+      localStorage.setItem('userEmail', email);
+      setUserEmail(email);
+      setIsCoachUser(isCoach(email));
+      const data = await fetchAssessmentsByEmail(email);
+      setAssessments(data);
+    } catch (err) {
+      console.error('Error fetching assessments:', err);
+      setError('Failed to load assessments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadAssessments = async () => {
-      try {
-        const email = localStorage.getItem('userEmail');
-        if (!email) {
-          setError('No email found');
-          setLoading(false);
-          return;
-        }
-
-        setUserEmail(email);
-        setIsCoachUser(isCoach(email));
-
-        if (!isCoach(email)) {
-          const data = await fetchAssessmentsByEmail(email);
-          setAssessments(data);
-        }
-      } catch (err) {
-        console.error('Error fetching assessments:', err);
-        setError('Failed to load assessments');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAssessments();
+    loadUserData('blutrich@gmail.com');
   }, []);
 
   if (loading) {

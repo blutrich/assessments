@@ -1,8 +1,9 @@
 import { fetchAssessmentsByEmail } from './airtable';
 
 const COACH_EMAILS = [
-  'coach@example.com', // Replace with actual coach emails
-  'blutrich@gmail.com' // Added for testing
+  'blutrich@gmail.com',
+  'oferblutrich@gmail.com',
+  'coach@climbing.com'
 ];
 
 export const isCoach = (email) => {

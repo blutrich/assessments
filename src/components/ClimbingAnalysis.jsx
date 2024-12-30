@@ -40,6 +40,8 @@ const formatMetricValue = (value, type) => {
       return parseFloat(value).toFixed(1);
     case 'weight':
       return parseFloat(value).toFixed(1);
+    case 'percentage':
+      return parseFloat(value).toFixed(1);
     default:
       return value;
   }
@@ -185,8 +187,11 @@ const ClimbingAnalysis = ({ assessments }) => {
     // Get the latest assessment
     const latest = sortedAssessments[0];
     console.log('Latest assessment:', latest);
-    console.log('Training Schedule from latest:', latest.Training_Schedule);
-    console.log('Training Schedule type:', typeof latest.Training_Schedule);
+    console.log('Weight:', latest['Personal Info']['Weight']);
+    console.log('Finger Strength Weight:', latest['Finger Strength Weight']);
+
+    const fingerStrengthPct = (Number(latest['Finger Strength Weight']) + Number(latest['Personal Info']['Weight'])) / Number(latest['Personal Info']['Weight']) * 100;
+    console.log('Finger Strength %:', fingerStrengthPct);
 
     const insights = generateInsights(sortedAssessments);
     const prediction = predictGrade(latest);
@@ -194,18 +199,31 @@ const ClimbingAnalysis = ({ assessments }) => {
     // Transform and sort data for charts (oldest to newest)
     const chartData = [...sortedAssessments]
       .reverse()
-      .map(assessment => ({
-        date: formatDate(assessment['Assessment Date']),
-        fingerStrength: Number(assessment['Finger Strength Weight']) || 0,
-        pullUps: Number(assessment['Pull Up Repetitions']) || 0,
-        pushUps: Number(assessment['Push Up Repetitions']) || 0,
-        toeToBar: Number(assessment['Toe To bar Repetitions']) || 0,
-        rpeFingerStrength: Number(assessment['RPE Finger Strength']) || 0,
-        rpePullUps: Number(assessment['RPE Pull Ups']) || 0,
-        rpePushUps: Number(assessment['RPE Push Ups']) || 0,
-        rpeToeToBar: Number(assessment['RPE Toe To Bar']) || 0,
-        rpeSpread: Number(assessment['RPE Leg Spread']) || 0
-      }));
+      .map(assessment => {
+        const weight = Number(assessment['Personal Info']['Weight']);
+        const addedWeight = Number(assessment['Finger Strength Weight']);
+        const strengthPct = (addedWeight + weight) / weight * 100;
+        
+        console.log('Assessment date:', assessment['Assessment Date']);
+        console.log('Weight:', weight);
+        console.log('Added weight:', addedWeight);
+        console.log('Strength %:', strengthPct);
+        
+        return {
+          date: formatDate(assessment['Assessment Date']),
+          fingerStrengthPct: strengthPct || 0,
+          fingerStrengthWeight: addedWeight || 0,
+          bodyWeight: weight || 0,
+          pullUps: Number(assessment['Pull Up Repetitions']) || 0,
+          pushUps: Number(assessment['Push Up Repetitions']) || 0,
+          toeToBar: Number(assessment['Toe To bar Repetitions']) || 0,
+          rpeFingerStrength: Number(assessment['RPE Finger Strength']) || 0,
+          rpePullUps: Number(assessment['RPE Pull Ups']) || 0,
+          rpePushUps: Number(assessment['RPE Push Ups']) || 0,
+          rpeToeToBar: Number(assessment['RPE Toe To Bar']) || 0,
+          rpeSpread: Number(assessment['RPE Leg Spread']) || 0
+        };
+      });
 
     // Calculate training days per week (excluding rest days)
     const trainingSchedule = latest.Training_Schedule || {};
@@ -234,26 +252,31 @@ const ClimbingAnalysis = ({ assessments }) => {
     console.log('Formatted schedule:', formattedSchedule);
 
     // Prepare strength profile data for radar chart
+    const bodyWeight = Number(latest['Personal Info']['Weight']) || 1; // prevent division by zero
     const strengthProfile = [
       {
         metric: 'Finger Strength',
-        value: Number(latest['Finger Strength Weight']) || 0,
-        fullMark: 80
+        value: Number(latest['Finger Strength Weight']) / bodyWeight || 0,
+        fullMark: 1.0,
+        rawValue: Number(latest['Finger Strength Weight']) || 0
       },
       {
         metric: 'Pull-ups',
-        value: Number(latest['Pull Up Repetitions']) || 0,
-        fullMark: 30
+        value: Number(latest['Pull Up Repetitions']) / bodyWeight || 0,
+        fullMark: 0.5,
+        rawValue: Number(latest['Pull Up Repetitions']) || 0
       },
       {
         metric: 'Push-ups',
-        value: Number(latest['Push Up Repetitions']) || 0,
-        fullMark: 50
+        value: Number(latest['Push Up Repetitions']) / bodyWeight || 0,
+        fullMark: 1.0,
+        rawValue: Number(latest['Push Up Repetitions']) || 0
       },
       {
         metric: 'Toe to Bar',
-        value: Number(latest['Toe To bar Repetitions']) || 0,
-        fullMark: 20
+        value: Number(latest['Toe To bar Repetitions']) / bodyWeight || 0,
+        fullMark: 0.3,
+        rawValue: Number(latest['Toe To bar Repetitions']) || 0
       }
     ];
 
@@ -314,7 +337,7 @@ const ClimbingAnalysis = ({ assessments }) => {
           <Dumbbell className="text-indigo-500" />
           Physical Metrics
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <MetricCard
             title="Height"
             value={latest['Personal Info']['Height']}
@@ -328,15 +351,18 @@ const ClimbingAnalysis = ({ assessments }) => {
             type="weight"
           />
           <MetricCard
-            title="Finger Strength"
+            title="Finger Strength (Added Weight)"
             value={latest['Finger Strength Weight']}
-            unit=" kg"
+            unit="kg"
+            subtitle="Weight added to body weight"
+            type="weight"
           />
           <MetricCard
-            title="Strength Ratio"
-            value={latest['Finger Strength Ratio']}
+            title="Finger Strength (%BW)"
+            value={((Number(latest['Finger Strength Weight']) + Number(latest['Personal Info']['Weight'])) / Number(latest['Personal Info']['Weight']) * 100).toFixed(1)}
             unit="%"
-            subtitle="% of body weight"
+            subtitle="Total weight as % of body weight"
+            type="percentage"
           />
         </div>
       </div>
@@ -365,54 +391,56 @@ const ClimbingAnalysis = ({ assessments }) => {
       <div className="space-y-6">
         {/* Strength Profile */}
         <div className="bg-pink-50 rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-pink-900">
+          <h2 className="text-xl font-bold text-pink-900 flex items-center gap-2 mb-4">
             <Activity className="text-pink-500" />
-            Strength Profile
+            Strength Profile (Relative to Body Weight)
           </h2>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={strengthProfile} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
-                <PolarGrid gridType="circle" />
-                <PolarAngleAxis 
-                  dataKey="metric" 
-                  tick={{ fill: '#be185d', fontSize: 14 }}
-                />
+              <RadarChart
+                cx={250}
+                cy={250}
+                outerRadius={150}
+                width={500}
+                height={500}
+                data={strengthProfile}
+              >
+                <PolarGrid />
+                <PolarAngleAxis dataKey="metric" />
                 <PolarRadiusAxis 
                   angle={90} 
                   domain={[0, 'auto']}
-                  tick={{ fill: '#be185d' }}
+                  tickFormatter={(value) => value.toFixed(2)}
                 />
                 <Radar
                   name="Current"
                   dataKey="value"
                   stroke="#ec4899"
                   fill="#ec4899"
-                  fillOpacity={0.5}
+                  fillOpacity={0.6}
                 />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    borderRadius: '0.5rem',
-                    border: '1px solid #fce7f3'
+                  formatter={(value, name, props) => {
+                    const metric = props.payload.metric;
+                    const rawValue = props.payload.rawValue;
+                    return [
+                      `${(value * 100).toFixed(1)}% of BW (${rawValue} ${metric === 'Finger Strength' ? 'kg' : 'reps'})`,
+                      'Current'
+                    ];
                   }}
-                  formatter={(value, name, props) => [
-                    `${value} ${props.payload.metric === 'Finger Strength' ? 'kg' : 
-                      props.payload.metric === 'Leg Spread' ? 'm' : 'reps'}`,
-                    'Current'
-                  ]}
                 />
               </RadarChart>
             </ResponsiveContainer>
           </div>
-          
-          {/* Legend for metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-            {strengthProfile.map((item) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+            {strengthProfile.map(item => (
               <div key={item.metric} className="bg-white p-3 rounded-lg">
                 <div className="text-sm font-medium text-pink-700">{item.metric}</div>
                 <div className="text-lg font-bold text-pink-900">
-                  {item.value} {item.metric === 'Finger Strength' ? 'kg' : 
-                    item.metric === 'Leg Spread' ? 'm' : 'reps'}
+                  {(item.value * 100).toFixed(1)}% BW
+                </div>
+                <div className="text-sm text-gray-500">
+                  {item.rawValue} {item.metric === 'Finger Strength' ? 'kg' : 'reps'}
                 </div>
               </div>
             ))}
@@ -422,35 +450,43 @@ const ClimbingAnalysis = ({ assessments }) => {
         {/* Individual Progress Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Finger Strength Progress */}
-          <div className="bg-pink-50 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-pink-900 mb-4">Finger Strength Progress</h3>
-            <div className="w-full h-[300px]">
-              <ResponsiveContainer>
-                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 25, left: 0 }}>
-                  <XAxis 
-                    dataKey="date" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    interval={0}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis />
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Finger Strength Progress</h3>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <Tooltip />
+                  <XAxis dataKey="date" />
+                  <YAxis yAxisId="left" orientation="left" stroke="#4f46e5" />
+                  <YAxis yAxisId="right" orientation="right" stroke="#ec4899" />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === 'Added Weight') return [`${value} kg`, name];
+                      if (name === '% of Body Weight') return [`${value.toFixed(1)}%`, name];
+                      return [value, name];
+                    }}
+                  />
+                  <Legend />
                   <Line
+                    yAxisId="left"
                     type="monotone"
-                    dataKey="fingerStrength"
+                    dataKey="fingerStrengthWeight"
+                    name="Added Weight"
+                    stroke="#4f46e5"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="fingerStrengthPct"
+                    name="% of Body Weight"
                     stroke="#ec4899"
                     strokeWidth={2}
-                    dot={{ r: 4, fill: "#ec4899" }}
-                    activeDot={{ r: 6, fill: "#be185d" }}
+                    dot={{ r: 4 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
-            <div className="mt-2 text-sm text-pink-700">
-              Latest RPE: {latest?.['RPE Finger Strength'] || 'N/A'}
             </div>
           </div>
 
