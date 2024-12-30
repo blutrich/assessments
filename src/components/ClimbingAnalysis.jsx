@@ -74,6 +74,13 @@ const ClimbingAnalysis = ({ assessments }) => {
     const totalWeight = addedWeight + bodyWeight;
     const strengthPercentage = (totalWeight / bodyWeight) * 100;
     
+    console.log('Finger Strength Calculation:', {
+      bodyWeight,
+      addedWeight,
+      totalWeight,
+      percentage: strengthPercentage
+    });
+    
     return strengthPercentage;
   };
 
@@ -794,6 +801,35 @@ const ClimbingAnalysis = ({ assessments }) => {
           </div>
         </div>
       )}
+      {/* Finger Strength Card */}
+      <div className="bg-white p-6 rounded-lg shadow-sm">
+        <h3 className="text-lg font-medium text-gray-900 mb-1">Finger Strength</h3>
+        <div className="flex items-baseline">
+          <p className="text-3xl font-bold text-pink-600">
+            {latest ? `${calculateFingerStrength(latest).toFixed(1)}%` : 'N/A'}
+          </p>
+          <p className="ml-2 text-sm text-gray-500">of body weight</p>
+        </div>
+        <div className="mt-1">
+          <p className="text-sm text-gray-600">
+            Body Weight: {latest?.['Personal Info']?.['Weight'] || 0}kg
+          </p>
+          <p className="text-sm text-gray-600">
+            Added Weight: {latest?.['Finger Strength Weight'] || 0}kg
+          </p>
+          <p className="text-sm text-gray-600">
+            Total Weight: {(Number(latest?.['Finger Strength Weight'] || 0) + 
+              Number(latest?.['Personal Info']?.['Weight'] || 0)).toFixed(1)}kg
+          </p>
+        </div>
+      </div>
+      <MetricCard
+        title="Finger Strength"
+        value={calculateFingerStrength(latest)}
+        unit="%"
+        subtitle={`Total: ${(Number(latest?.['Finger Strength Weight'] || 0) + Number(latest?.['Personal Info']?.['Weight'] || 0)).toFixed(1)}kg`}
+        type="percentage"
+      />
     </div>
   );
 };
