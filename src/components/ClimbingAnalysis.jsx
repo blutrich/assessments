@@ -62,6 +62,21 @@ const MetricCard = ({ title, value, unit = '', subtitle = '', type = 'default' }
 const ClimbingAnalysis = ({ assessments }) => {
   const analysisRef = useRef(null);
 
+  const calculateFingerStrength = (assessment) => {
+    if (!assessment || !assessment['Personal Info']) return 100;
+    
+    const bodyWeight = Number(assessment['Personal Info']['Weight']) || 0;
+    const addedWeight = Number(assessment['Finger Strength Weight']) || 0;
+    
+    if (bodyWeight <= 0) return 100; // Return baseline if no valid body weight
+    
+    // Calculate total weight as percentage of body weight
+    const totalWeight = addedWeight + bodyWeight;
+    const strengthPercentage = (totalWeight / bodyWeight) * 100;
+    
+    return strengthPercentage;
+  };
+
   const exportFullAnalysis = async (format = 'images') => {
     if (analysisRef.current) {
       try {
@@ -192,21 +207,6 @@ const ClimbingAnalysis = ({ assessments }) => {
     console.log('Latest assessment:', latest);
     console.log('Weight:', personalInfo['Weight']);
     console.log('Finger Strength Weight:', latest['Finger Strength Weight']);
-
-    const calculateFingerStrength = (assessment) => {
-      if (!assessment || !assessment['Personal Info']) return 100;
-      
-      const bodyWeight = Number(assessment['Personal Info']['Weight']) || 0;
-      const addedWeight = Number(assessment['Finger Strength Weight']) || 0;
-      
-      if (bodyWeight <= 0) return 100; // Return baseline if no valid body weight
-      
-      // Calculate total weight as percentage of body weight
-      const totalWeight = addedWeight + bodyWeight;
-      const strengthPercentage = (totalWeight / bodyWeight) * 100;
-      
-      return strengthPercentage;
-    };
 
     const fingerStrengthPct = calculateFingerStrength(latest);
     console.log('Finger Strength %:', fingerStrengthPct);
