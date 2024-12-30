@@ -284,30 +284,31 @@ const ClimbingAnalysis = ({ assessments }) => {
 
     // Prepare strength profile data for radar chart
     const bodyWeight = Number(latest['Personal Info']['Weight']) || 1; // prevent division by zero
+    const addedWeight = Number(latest['Finger Strength Weight']) || 0;
     const strengthProfile = [
       {
         metric: 'Finger Strength',
-        value: Number(latest['Finger Strength Weight']) / bodyWeight || 0,
-        fullMark: 1.0,
-        rawValue: Number(latest['Finger Strength Weight']) || 0
+        value: ((addedWeight + bodyWeight) / bodyWeight) || 1,
+        fullMark: 2.0, // Adjusted for percentage display (200% max)
+        rawValue: `${addedWeight}kg added (${((addedWeight + bodyWeight) / bodyWeight * 100).toFixed(1)}% BW)`
       },
       {
         metric: 'Pull-ups',
         value: Number(latest['Pull Up Repetitions']) / bodyWeight || 0,
         fullMark: 0.5,
-        rawValue: Number(latest['Pull Up Repetitions']) || 0
+        rawValue: `${Number(latest['Pull Up Repetitions']) || 0} reps`
       },
       {
         metric: 'Push-ups',
         value: Number(latest['Push Up Repetitions']) / bodyWeight || 0,
         fullMark: 1.0,
-        rawValue: Number(latest['Push Up Repetitions']) || 0
+        rawValue: `${Number(latest['Push Up Repetitions']) || 0} reps`
       },
       {
         metric: 'Toe to Bar',
         value: Number(latest['Toe To bar Repetitions']) / bodyWeight || 0,
         fullMark: 0.3,
-        rawValue: Number(latest['Toe To bar Repetitions']) || 0
+        rawValue: `${Number(latest['Toe To bar Repetitions']) || 0} reps`
       }
     ];
 
@@ -455,7 +456,7 @@ const ClimbingAnalysis = ({ assessments }) => {
                     const metric = props.payload.metric;
                     const rawValue = props.payload.rawValue;
                     return [
-                      `${(value * 100).toFixed(1)}% of BW (${rawValue} ${metric === 'Finger Strength' ? 'kg' : 'reps'})`,
+                      `${(value * 100).toFixed(1)}% of BW (${rawValue})`,
                       'Current'
                     ];
                   }}
@@ -463,16 +464,12 @@ const ClimbingAnalysis = ({ assessments }) => {
               </RadarChart>
             </ResponsiveContainer>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
             {strengthProfile.map(item => (
-              <div key={item.metric} className="bg-white p-3 rounded-lg">
-                <div className="text-sm font-medium text-pink-700">{item.metric}</div>
-                <div className="text-lg font-bold text-pink-900">
-                  {(item.value * 100).toFixed(1)}% BW
-                </div>
-                <div className="text-sm text-gray-500">
-                  {item.rawValue} {item.metric === 'Finger Strength' ? 'kg' : 'reps'}
-                </div>
+              <div key={item.metric} className="bg-pink-50 p-4 rounded-lg">
+                <p className="text-pink-700 font-semibold">{item.metric}</p>
+                <p className="text-2xl font-bold text-pink-900">{(item.value * 100).toFixed(1)}% BW</p>
+                <p className="text-sm text-pink-600">{item.rawValue}</p>
               </div>
             ))}
           </div>
